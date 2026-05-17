@@ -1,0 +1,78 @@
+{
+  "/Users/fashad/fashad/universal-mcp/tests/test_security.py": {
+    "mtime": 1778978279.1428158,
+    "hash": "5abec69f92c25cc5a1bc4353f7691549"
+  },
+  "/Users/fashad/fashad/universal-mcp/tests/conftest.py": {
+    "mtime": 1778978258.8516228,
+    "hash": "e8b16584985aa3df3fb92db8a8bc2aad"
+  },
+  "/Users/fashad/fashad/universal-mcp/tests/test_mcp_tools.py": {
+    "mtime": 1778978330.0538268,
+    "hash": "27723e27de76512463571894280b98ae"
+  },
+  "/Users/fashad/fashad/universal-mcp/tests/__init__.py": {
+    "mtime": 1778978134.9052522,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/fashad/fashad/universal-mcp/tests/test_adapters.py": {
+    "mtime": 1778978305.0096734,
+    "hash": "246839937e1ec562c9437293e611d733"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/server.py": {
+    "mtime": 1778978250.6294134,
+    "hash": "3e515e0cc5a3c79e23aebe28a8fecee3"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/config.py": {
+    "mtime": 1778978148.690879,
+    "hash": "e65bb9944001d3d2c00b24cf655ecb87"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/__init__.py": {
+    "mtime": 1778978134.7839582,
+    "hash": "7ec5c42f402ff2a9f0e5d1ab967e82db"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/security/sanitizer.py": {
+    "mtime": 1778978164.053804,
+    "hash": "a0cd743a7a42ce9350edf7c56c7f6d3b"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/security/__init__.py": {
+    "mtime": 1778978134.8533533,
+    "hash": "4b628cb48312bc13191bad925731d7f8"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/adapters/postgresql.py": {
+    "mtime": 1778978192.4344049,
+    "hash": "0dce42129cfa40abeb12a45370592b34"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/adapters/__init__.py": {
+    "mtime": 1778978134.8273523,
+    "hash": "9bc15a66fb1baa2c317eb03030177520"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/adapters/sqlite.py": {
+    "mtime": 1778978206.2791948,
+    "hash": "15715c58e30a498e34474c35bc814f49"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/adapters/base.py": {
+    "mtime": 1778978174.2652023,
+    "hash": "667453e0bd1ee83a5ef4f8500b07fe9b"
+  },
+  "/Users/fashad/fashad/universal-mcp/src/universal_db_mcp/adapters/mysql.py": {
+    "mtime": 1778978220.4891398,
+    "hash": "891611d216702fa17e31bf6fa939a5ab"
+  },
+  "/Users/fashad/fashad/universal-mcp/PROJECT_SUMMARY.md": {
+    "mtime": 1778977513.065206,
+    "hash": "06cc06221d6fa8662a206f8319af0ee2"
+  },
+  "/Users/fashad/fashad/universal-mcp/UNIVERSAL_DATABASE_MCP_PYTHON.md": {
+    "mtime": 1778976537.9420123,
+    "hash": "67f2580d08c8af071bd9ea22fbea253f"
+  },
+  "/Users/fashad/fashad/universal-mcp/README.md": {
+    "mtime": 1778977514.9778187,
+    "hash": "0b845c5b34042f7107ae90f9ec9937f6"
+  },
+  "/Users/fashad/fashad/universal-mcp/CLAUDE.md": {
+    "mtime": 1778977514.1518016,
+    "hash": "21684e8fb5c97a255b0217af79b32dc5"
+  }
+}
