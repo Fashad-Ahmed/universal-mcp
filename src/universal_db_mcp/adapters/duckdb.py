@@ -1,5 +1,6 @@
 """DuckDB database adapter — columnar analytics, zero-infra, in-memory or file-based."""
 
+import re
 import time
 import asyncio
 import duckdb
@@ -8,6 +9,32 @@ from typing import List, Optional, Any
 from .base import DatabaseAdapter, QueryResult, SchemaInfo, TableInfo, ExplainResult, HealthStatus
 from ..config import DatabaseConfig
 from ..security.sanitizer import SQLSanitizer
+
+# DuckDB exposes SQL functions that read arbitrary files from the filesystem.
+# These bypass the engine-level read_only flag (which only blocks writes) and
+# are invisible to the generic SQL-injection sanitizer. Block them explicitly.
+_DUCKDB_FILESYSTEM_PATTERN = re.compile(
+    r"\b(read_csv|read_csv_auto|read_parquet|read_json|read_json_auto"
+    r"|read_ndjson|read_ndjson_auto|glob|scan_parquet|scan_csv|scan_json"
+    r"|parquet_scan|csv_scan|json|load|install|httpfs|copy)\s*[\(\s]",
+    re.IGNORECASE,
+)
+
+# DuckDB extension loading — blocked via keyword match above, but also
+# catch the bare LOAD/INSTALL statement forms without parentheses.
+_DUCKDB_LOAD_PATTERN = re.compile(
+    r"^\s*(load|install)\s+\S",
+    re.IGNORECASE,
+)
+
+
+def _check_duckdb_sql(sql: str) -> None:
+    """Raise ValueError if sql contains DuckDB filesystem or extension functions."""
+    if _DUCKDB_FILESYSTEM_PATTERN.search(sql) or _DUCKDB_LOAD_PATTERN.search(sql):
+        raise ValueError(
+            "DuckDB filesystem functions (read_csv, read_parquet, glob, LOAD, etc.) "
+            "are not permitted via MCP. Use the configured database connection instead."
+        )
 
 
 class DuckDBAdapter(DatabaseAdapter):
@@ -53,6 +80,8 @@ class DuckDBAdapter(DatabaseAdapter):
     async def query(self, sql: str, params: Optional[List[Any]] = None) -> QueryResult:
         if not self._conn:
             raise RuntimeError("Database not connected")
+
+        _check_duckdb_sql(sql)
 
         conn = self._conn
         start = time.monotonic()
@@ -133,6 +162,8 @@ class DuckDBAdapter(DatabaseAdapter):
     async def explain(self, sql: str, params: Optional[List[Any]] = None) -> ExplainResult:
         if not self._conn:
             raise RuntimeError("Database not connected")
+
+        _check_duckdb_sql(sql)
 
         conn = self._conn
 

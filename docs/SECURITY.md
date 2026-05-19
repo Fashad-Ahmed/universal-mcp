@@ -28,9 +28,13 @@ Every database connection defaults to `read_only=True`. This is enforced at the
 | PostgreSQL | `init` callback sets `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY` on every pooled connection |
 | SQLite     | `file:path?mode=ro` URI — OS-level read-only file open     |
 | MySQL      | Transaction-level read-only flag per connection             |
-| DuckDB     | `duckdb.connect(read_only=True)` — engine-level enforcement |
+| DuckDB     | `duckdb.connect(read_only=True)` — prevents writes; **does not** block DuckDB file-reading functions (see Layer 8) |
 
-Even if an attacker bypasses Layer 2 and 3, the database driver rejects writes.
+Even if an attacker bypasses Layers 2 and 3, the database driver rejects writes.
+
+> **DuckDB note**: `read_only=True` prevents INSERT/UPDATE/DELETE/ALTER — it does **not**
+> prevent `read_csv()`, `read_parquet()`, or other file-reading SQL functions, which are
+> READ operations at the engine level. Layer 8 blocks these explicitly.
 
 To enable writes: `ALLOW_DESTRUCTIVE=true` (explicit opt-in, per-database).
 
@@ -115,6 +119,31 @@ add a `LIMIT` clause or paginate.
 
 ---
 
+## Layer 8: DuckDB Filesystem Function Blocking
+
+DuckDB exposes SQL functions that read arbitrary files from the server filesystem —
+`read_csv()`, `read_parquet()`, `read_json()`, `glob()`, etc. These are legitimate
+DuckDB features but are dangerous in an untrusted MCP context because:
+
+- They bypass `read_only=True` (which only blocks writes, not reads)
+- They are invisible to the generic SQL injection sanitizer (Layers 2–4)
+- They can expose any file readable by the MCP server process
+
+`DuckDBAdapter.query()` and `DuckDBAdapter.explain()` apply a DuckDB-specific
+regex blocklist before every `conn.execute()` call:
+
+```python
+_DUCKDB_FILESYSTEM_PATTERN = re.compile(
+    r"\b(read_csv|read_csv_auto|read_parquet|read_json|read_json_auto"
+    r"|read_ndjson|read_ndjson_auto|glob|scan_parquet|scan_csv|scan_json"
+    r"|parquet_scan|csv_scan|json|load|install|httpfs|copy)\s*[\(\s]",
+    re.IGNORECASE,
+)
+```
+
+This check runs at the **adapter layer** (not the sanitizer) because these functions
+are DuckDB-specific and would be safe in other adapter contexts.
+
 ## Layer 7: Identifier Sanitization
 
 When building dynamic SQL internally (e.g., schema introspection), table and
@@ -131,16 +160,18 @@ internally-generated query.
 
 ## Threat Model Summary
 
-| Threat                        | Mitigated by                           |
-|-------------------------------|----------------------------------------|
-| Prompt injection → DROP TABLE | Layers 1, 2                            |
-| UNION-based exfiltration      | Layer 3                                |
-| Stacked statement attack      | Layers 3, 4                            |
-| Time-based blind injection    | Layer 3                                |
-| Parameter smuggling           | Layer 5                                |
-| Full-table data exfil         | Layer 6                                |
-| Dynamic SQL identifier attack | Layer 7                                |
-| Compromised LLM output        | All layers (defense-in-depth)          |
+| Threat                                 | Mitigated by                           |
+|----------------------------------------|----------------------------------------|
+| Prompt injection → DROP TABLE          | Layers 1, 2                            |
+| UNION-based exfiltration               | Layer 3                                |
+| Stacked statement attack               | Layers 3, 4                            |
+| Time-based blind injection             | Layer 3                                |
+| Parameter smuggling                    | Layer 5                                |
+| Full-table data exfil                  | Layer 6                                |
+| DuckDB file read (`read_csv`, `glob`)  | Layer 8                                |
+| DuckDB extension loading (`LOAD httpfs`)| Layer 8                               |
+| Dynamic SQL identifier attack          | Layer 7                                |
+| Compromised LLM output                 | All layers (defense-in-depth)          |
 
 ---
 

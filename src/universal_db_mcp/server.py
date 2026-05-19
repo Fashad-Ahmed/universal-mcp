@@ -218,6 +218,15 @@ async def explain(
     Returns:
         JSON with plan, estimated_cost, and estimated_rows.
     """
+    cfg = server_config
+    if cfg is None:
+        return _error("Server not initialized")
+
+    # EXPLAIN never needs destructive operations — always validate read-only.
+    is_valid, errors = SQLSanitizer.validate_query(sql, allow_destructive=False)
+    if not is_valid:
+        return _error("Query validation failed", errors)
+
     try:
         adapter = _get_adapter(database)
         plan = await adapter.explain(sql, params)

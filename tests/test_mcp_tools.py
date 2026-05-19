@@ -172,6 +172,33 @@ class TestExplainTool:
         result = json.loads(raw)
         assert "error" in result
 
+    @pytest.mark.asyncio
+    async def test_explain_rejects_union_select(self, server_with_sqlite):
+        # Vuln 2 fix: explain tool must apply SQLSanitizer like query tool does
+        raw = await server.explain("SELECT * FROM users UNION SELECT * FROM users")
+        result = json.loads(raw)
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_explain_rejects_destructive_sql(self, server_with_sqlite):
+        raw = await server.explain("DROP TABLE users")
+        result = json.loads(raw)
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_explain_rejects_sql_comment_injection(self, server_with_sqlite):
+        raw = await server.explain("SELECT 1 -- injected comment")
+        result = json.loads(raw)
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_explain_server_not_initialized_returns_error(self, adapter_with_data):
+        server.adapters["sqlite::memory:"] = adapter_with_data
+        server.server_config = None
+        raw = await server.explain("SELECT 1")
+        result = json.loads(raw)
+        assert "error" in result
+
 
 class TestHealthTool:
     @pytest.mark.asyncio

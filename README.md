@@ -70,6 +70,7 @@ That's it. Claude Code discovers the tools automatically.
 | 5 | **Parameter type enforcement** — only `str`, `int`, `float`, `bool`, `null` accepted as parameters |
 | 6 | **Result size limits** — truncated at `MAX_RESULT_ROWS` (default 1000) to prevent memory exhaustion |
 | 7 | **Identifier sanitization** — table/column names stripped of metacharacters in internally-generated SQL |
+| 8 | **DuckDB filesystem blocklist** — `read_csv()`, `read_parquet()`, `glob()`, `LOAD`, `INSTALL`, `httpfs`, `COPY` blocked at adapter level; `read_only=True` only blocks writes, not file reads |
 
 Full threat model: [docs/SECURITY.md](docs/SECURITY.md)
 

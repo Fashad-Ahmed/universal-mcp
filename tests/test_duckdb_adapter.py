@@ -145,6 +145,65 @@ class TestDuckDBExplain:
         assert len(result.plan) > 0
 
 
+class TestDuckDBFilesystemBlocking:
+    """Vuln 1 fix: DuckDB filesystem functions must be blocked at adapter layer."""
+
+    @pytest.mark.asyncio
+    async def test_read_csv_blocked_in_query(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.query("SELECT * FROM read_csv('/etc/passwd')")
+
+    @pytest.mark.asyncio
+    async def test_read_parquet_blocked_in_query(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.query("SELECT * FROM read_parquet('/tmp/data.parquet')")
+
+    @pytest.mark.asyncio
+    async def test_read_json_blocked_in_query(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.query("SELECT * FROM read_json('/etc/hosts')")
+
+    @pytest.mark.asyncio
+    async def test_glob_blocked_in_query(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.query("SELECT * FROM glob('/home/*/.env')")
+
+    @pytest.mark.asyncio
+    async def test_load_extension_blocked_in_query(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.query("LOAD httpfs")
+
+    @pytest.mark.asyncio
+    async def test_install_blocked_in_query(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.query("INSTALL httpfs")
+
+    @pytest.mark.asyncio
+    async def test_read_csv_blocked_in_explain(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.explain("SELECT * FROM read_csv('/etc/passwd')")
+
+    @pytest.mark.asyncio
+    async def test_read_parquet_blocked_in_explain(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.explain("SELECT * FROM read_parquet('/tmp/data.parquet')")
+
+    @pytest.mark.asyncio
+    async def test_copy_blocked_in_query(self, duck):
+        with pytest.raises(ValueError, match="filesystem functions"):
+            await duck.query("COPY products TO '/tmp/out.csv'")
+
+    @pytest.mark.asyncio
+    async def test_normal_select_not_blocked(self, duck):
+        result = await duck.query("SELECT * FROM products ORDER BY id")
+        assert len(result.rows) == 2
+
+    @pytest.mark.asyncio
+    async def test_normal_aggregation_not_blocked(self, duck):
+        result = await duck.query("SELECT COUNT(*) AS n FROM products")
+        assert result.rows[0]["n"] == 2
+
+
 class TestDuckDBHealth:
     @pytest.mark.asyncio
     async def test_health_connected(self, duck):
