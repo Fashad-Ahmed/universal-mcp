@@ -11,7 +11,7 @@ load_dotenv()
 class DatabaseConfig(BaseModel):
     """Configuration for a single database connection."""
 
-    type: str = Field(..., description="Database type: postgresql, sqlite, mysql")
+    type: str = Field(..., description="Database type: postgresql, sqlite, mysql, duckdb")
     host: Optional[str] = None
     port: Optional[int] = None
     database: str = Field(..., description="Database name or file path")
@@ -102,6 +102,16 @@ def load_config() -> ServerConfig:
                 ssl=os.getenv("MYSQL_SSL", "false").lower() == "true",
                 read_only=os.getenv("MYSQL_READONLY", "true").lower() == "true",
                 max_connections=int(os.getenv("MYSQL_MAX_CONN", "10")),
+                query_timeout=int(os.getenv("QUERY_TIMEOUT", "30")),
+            )
+        )
+
+    if os.getenv("DUCKDB_PATH"):
+        config.databases.append(
+            DatabaseConfig(
+                type="duckdb",
+                database=os.getenv("DUCKDB_PATH", ":memory:"),
+                read_only=os.getenv("DUCKDB_READONLY", "true").lower() == "true",
                 query_timeout=int(os.getenv("QUERY_TIMEOUT", "30")),
             )
         )

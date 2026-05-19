@@ -14,6 +14,7 @@ from .adapters.base import DatabaseAdapter
 from .adapters.postgresql import PostgreSQLAdapter
 from .adapters.sqlite import SQLiteAdapter
 from .adapters.mysql import MySQLAdapter
+from .adapters.duckdb import DuckDBAdapter
 
 server_config: Optional[ServerConfig] = None
 adapters: dict[str, DatabaseAdapter] = {}
@@ -26,6 +27,8 @@ def _create_adapter(db_config: Any) -> DatabaseAdapter:
         return SQLiteAdapter(db_config)
     elif db_config.type == "mysql":
         return MySQLAdapter(db_config)
+    elif db_config.type == "duckdb":
+        return DuckDBAdapter(db_config)
     raise ValueError(f"Unsupported database type: {db_config.type}")
 
 
