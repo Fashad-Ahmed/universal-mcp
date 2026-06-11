@@ -99,6 +99,23 @@ Claude: [uses query tool → SELECT region, strftime('%Y-%m', date) AS month, SU
 
 ---
 
+## Natural Language → SQL
+
+No separate NL-to-SQL tool needed — Claude already does this. Give it the
+`schema` tool and ask in plain English:
+
+```
+You: "Which customers placed more than 5 orders last month?"
+Claude: [calls schema() to see table structure, then query() with the
+         generated SQL — every query still passes through all 8 security
+         layers before touching your database]
+```
+
+Pair with `dry_run: true` (`DRYRUN=true`) while prototyping — Claude gets the
+query plan back without anything executing.
+
+---
+
 ## Docker
 
 ```bash

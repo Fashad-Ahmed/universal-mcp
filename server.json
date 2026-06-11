@@ -1,0 +1,56 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-06-18/server.schema.json",
+  "name": "io.github.Fashad-Ahmed/universal-db-mcp",
+  "description": "Security-first, multi-database MCP server for PostgreSQL, SQLite, MySQL, and DuckDB with 8-layer SQL injection prevention, read-only-by-default access, dry-run mode, and table allowlists.",
+  "repository": {
+    "url": "https://github.com/Fashad-Ahmed/universal-mcp",
+    "source": "github"
+  },
+  "version": "1.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "universal-db-mcp",
+      "version": "1.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "POSTGRES_URI",
+          "description": "PostgreSQL connection string (read-only user recommended)",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "SQLITE_PATH",
+          "description": "Path to a SQLite database file",
+          "isRequired": false
+        },
+        {
+          "name": "MYSQL_URI",
+          "description": "MySQL connection string (read-only user recommended)",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "DUCKDB_PATH",
+          "description": "Path to a DuckDB file, or :memory:",
+          "isRequired": false
+        },
+        {
+          "name": "ALLOW_DESTRUCTIVE",
+          "description": "Set to true to allow INSERT/UPDATE/DELETE/DDL (default: false)",
+          "isRequired": false,
+          "default": "false"
+        },
+        {
+          "name": "MAX_RESULT_ROWS",
+          "description": "Maximum rows returned per query (default: 1000)",
+          "isRequired": false,
+          "default": "1000"
+        }
+      ]
+    }
+  ]
+}
