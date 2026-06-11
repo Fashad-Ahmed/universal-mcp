@@ -1,5 +1,7 @@
 # Universal Database MCP Server
 
+<!-- mcp-name: io.github.Fashad-Ahmed/universal-db-mcp -->
+
 **The security-first, Python-native MCP server for database access from AI agents.**
 
 [![CI](https://github.com/Fashad-Ahmed/universal-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Fashad-Ahmed/universal-mcp/actions/workflows/ci.yml)

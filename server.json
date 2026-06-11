@@ -1,17 +1,17 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-06-18/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Fashad-Ahmed/universal-db-mcp",
-  "description": "Security-first, multi-database MCP server for PostgreSQL, SQLite, MySQL, and DuckDB with 8-layer SQL injection prevention, read-only-by-default access, dry-run mode, and table allowlists.",
+  "description": "Security-first MCP server for PostgreSQL, SQLite, MySQL, DuckDB with SQL injection prevention.",
   "repository": {
     "url": "https://github.com/Fashad-Ahmed/universal-mcp",
     "source": "github"
   },
-  "version": "1.1.1",
+  "version": "1.1.2",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "universal-db-mcp",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "transport": {
         "type": "stdio"
       },

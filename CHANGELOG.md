@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.2
+
+### Added
+- `mcp-name` README marker for MCP registry ownership verification.
+
 ## v1.1.1
 
 ### Fixed
