@@ -44,3 +44,6 @@ coverage.xml
 .env.*
 !.env.example
 demo.db
+
+# graphify
+graphify-out/
