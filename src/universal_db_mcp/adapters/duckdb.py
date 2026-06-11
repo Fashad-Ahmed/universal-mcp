@@ -122,8 +122,10 @@ class DuckDBAdapter(DatabaseAdapter):
                 if table_names:
                     safe_names = [SQLSanitizer.sanitize_identifier(t) for t in table_names]
                     placeholders = ",".join("?" * len(safe_names))
+                    # placeholders is a fixed "?,?,..." string; actual values
+                    # are bound via parameters below, not interpolated.
                     return conn.execute(
-                        f"SELECT table_name FROM information_schema.tables "
+                        f"SELECT table_name FROM information_schema.tables "  # nosec B608
                         f"WHERE table_schema='main' AND table_name IN ({placeholders})",
                         safe_names,
                     ).fetchall()

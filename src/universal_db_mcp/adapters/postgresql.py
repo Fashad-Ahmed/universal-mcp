@@ -83,29 +83,32 @@ class PostgreSQLAdapter(DatabaseAdapter):
             where_extra = "AND t.tablename = ANY($1::text[])"
             params.append(table_names)
 
-        sql = f"""
-        SELECT
-            t.schemaname,
-            t.tablename,
-            c.column_name,
-            c.data_type,
-            c.is_nullable,
-            c.column_default,
-            CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN true ELSE false END AS is_primary
-        FROM pg_tables t
-        JOIN information_schema.columns c
-            ON t.tablename = c.table_name AND t.schemaname = c.table_schema
-        LEFT JOIN information_schema.key_column_usage kcu
-            ON c.table_schema = kcu.table_schema
-            AND c.table_name = kcu.table_name
-            AND c.column_name = kcu.column_name
-        LEFT JOIN information_schema.table_constraints tc
-            ON kcu.constraint_name = tc.constraint_name
-            AND kcu.table_schema = tc.table_schema
-        WHERE t.schemaname NOT IN ('pg_catalog', 'information_schema')
-            {where_extra}
-        ORDER BY t.tablename, c.ordinal_position
-        """
+        # where_extra is a fixed "$1::text[]" placeholder clause; actual
+        # table names are bound as a parameter below, not interpolated.
+        sql_lines = [
+            "SELECT",
+            "    t.schemaname,",
+            "    t.tablename,",
+            "    c.column_name,",
+            "    c.data_type,",
+            "    c.is_nullable,",
+            "    c.column_default,",
+            "    CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN true ELSE false END AS is_primary",
+            "FROM pg_tables t",
+            "JOIN information_schema.columns c",
+            "    ON t.tablename = c.table_name AND t.schemaname = c.table_schema",
+            "LEFT JOIN information_schema.key_column_usage kcu",
+            "    ON c.table_schema = kcu.table_schema",
+            "    AND c.table_name = kcu.table_name",
+            "    AND c.column_name = kcu.column_name",
+            "LEFT JOIN information_schema.table_constraints tc",
+            "    ON kcu.constraint_name = tc.constraint_name",
+            "    AND kcu.table_schema = tc.table_schema",
+            "WHERE t.schemaname NOT IN ('pg_catalog', 'information_schema')",
+            where_extra,
+            "ORDER BY t.tablename, c.ordinal_position",
+        ]
+        sql = "\n".join(sql_lines)
 
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(sql, *params)

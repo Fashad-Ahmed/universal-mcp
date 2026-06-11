@@ -84,13 +84,16 @@ class MySQLAdapter(DatabaseAdapter):
             where_extra = f"AND TABLE_NAME IN ({placeholders})"
             params.extend(table_names)
 
-        sql = f"""
-        SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-            {where_extra}
-        ORDER BY TABLE_NAME, ORDINAL_POSITION
-        """
+        # where_extra contains only fixed "%s" placeholders; actual table
+        # names are bound as parameters below, not interpolated.
+        sql_lines = [
+            "SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY",
+            "FROM INFORMATION_SCHEMA.COLUMNS",
+            "WHERE TABLE_SCHEMA = DATABASE()",
+            where_extra,
+            "ORDER BY TABLE_NAME, ORDINAL_POSITION",
+        ]
+        sql = "\n".join(sql_lines)
 
         async with self.pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cur:

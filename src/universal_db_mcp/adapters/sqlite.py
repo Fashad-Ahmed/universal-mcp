@@ -67,7 +67,9 @@ class SQLiteAdapter(DatabaseAdapter):
 
         if table_names:
             placeholders = ",".join("?" * len(table_names))
-            q = f"SELECT name FROM sqlite_master WHERE type='table' AND name IN ({placeholders})"
+            # placeholders is a fixed "?,?,..." string; actual table names
+            # are bound as parameters below, not interpolated.
+            q = f"SELECT name FROM sqlite_master WHERE type='table' AND name IN ({placeholders})"  # nosec B608
             async with self.db.execute(q, table_names) as cur:
                 tables_raw = await cur.fetchall()
         else:
