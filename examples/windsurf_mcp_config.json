@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mydb": {
+      "command": "uvx",
+      "args": ["universal-db-mcp"],
+      "env": {
+        "DUCKDB_PATH": "./analytics.duckdb",
+        "ALLOW_DESTRUCTIVE": "false"
+      }
+    }
+  }
+}

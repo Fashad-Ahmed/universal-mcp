@@ -2,6 +2,8 @@
 
 **The security-first, Python-native MCP server for database access from AI agents.**
 
+[![CI](https://github.com/Fashad-Ahmed/universal-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Fashad-Ahmed/universal-mcp/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/universal-db-mcp.svg)](https://pypi.org/project/universal-db-mcp/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastMCP](https://img.shields.io/badge/MCP-FastMCP-green.svg)](https://github.com/jlowin/fastmcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,7 +13,7 @@
 ## Why This Exists
 
 Most database MCP servers give AI agents raw SQL access and hope for the best.
-This server assumes the LLM is untrusted input and applies 7 layers of injection
+This server assumes the LLM is untrusted input and applies 8 layers of injection
 prevention before any query reaches your database — including blocking UNION attacks,
 stacked statements, time-based injection, and comment bypasses.
 
@@ -54,9 +56,12 @@ Add to Claude Code in `~/.claude/mcp_servers.json`:
 
 That's it. Claude Code discovers the tools automatically.
 
+More client configs (Claude Desktop, Cursor, Windsurf, Docker) in
+[`examples/`](examples/).
+
 ---
 
-## Security Model: 7 Layers
+## Security Model: 8 Layers
 
 > Read-only by default. Defense-in-depth. Every query validated before it
 > touches the driver.
@@ -94,6 +99,21 @@ Claude: [uses query tool → SELECT region, strftime('%Y-%m', date) AS month, SU
 
 ---
 
+## Docker
+
+```bash
+docker build -t universal-db-mcp .
+docker run -i --rm \
+  -e POSTGRES_URI=postgresql://readonly:pass@host.docker.internal:5432/mydb \
+  -e ALLOW_DESTRUCTIVE=false \
+  universal-db-mcp
+```
+
+See [`examples/docker_mcp_config.json`](examples/docker_mcp_config.json) for
+wiring this into an MCP client.
+
+---
+
 ## All Databases
 
 ```bash
@@ -119,11 +139,18 @@ POSTGRES_URI=... SQLITE_PATH=... uvx universal-db-mcp
 
 | Tool | Description |
 |------|-------------|
-| `query` | Execute SQL — read-only by default, all 7 security layers apply |
+| `query` | Execute SQL — read-only by default, all 8 security layers apply |
 | `schema` | Inspect tables and columns — no config needed |
 | `explain` | Get query execution plan without running the query |
-| `health` | Check connection status and DB version |
+| `health` | Check connection status, DB version, and pool metrics |
 | `list_databases` | Show all configured databases and connection state |
+| `query_history` | Inspect the last 100 executed queries |
+| `snapshot_schema` | Capture current schema for drift detection |
+| `schema_diff` | Compare current schema against the last snapshot |
+
+**v1.1.0**: dry-run mode (`DRYRUN=true`), table allowlists (`WHITELISTED_TABLES`), query
+complexity warnings, structured audit logs, and a `--check` CLI flag for connectivity
+validation. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -211,7 +238,7 @@ src/universal_db_mcp/
 │   ├── mysql.py       # aiomysql, DictCursor
 │   └── duckdb.py      # duckdb, thread-pool executor, lock-guarded
 └── security/
-    └── sanitizer.py   # SQLSanitizer — 7-layer injection prevention
+    └── sanitizer.py   # SQLSanitizer — 8-layer injection prevention
 
 docs/
 └── SECURITY.md        # Full security architecture and threat model
@@ -227,7 +254,7 @@ docs/
 | Local DBs | SQLite + DuckDB zero-infra | No SQLite |
 | Analytics | DuckDB in-process | No columnar adapter |
 | Auth model | Read-only by default + env vars | IAM / GCP-native |
-| SQL injection | 7-layer sanitizer + parameterized | Auth-focused |
+| SQL injection | 8-layer sanitizer + parameterized | Auth-focused |
 | Extend | Python ecosystem, any `pip` package | Go plugins |
 | Vendor | Neutral | Google Cloud funnel |
 

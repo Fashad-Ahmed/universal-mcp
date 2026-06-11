@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mydb": {
+      "command": "uvx",
+      "args": ["universal-db-mcp"],
+      "env": {
+        "SQLITE_PATH": "/Users/you/projects/myapp/db.sqlite3",
+        "ALLOW_DESTRUCTIVE": "false"
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mydb": {
+      "command": "uvx",
+      "args": ["universal-db-mcp"],
+      "env": {
+        "POSTGRES_URI": "postgresql://readonly:pass@localhost:5432/mydb",
+        "ALLOW_DESTRUCTIVE": "false",
+        "MAX_RESULT_ROWS": "1000"
+      }
+    }
+  }
+}

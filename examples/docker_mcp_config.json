@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "mydb": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "POSTGRES_URI",
+        "-e", "ALLOW_DESTRUCTIVE",
+        "fashadahmed/universal-db-mcp"
+      ],
+      "env": {
+        "POSTGRES_URI": "postgresql://readonly:pass@host.docker.internal:5432/mydb",
+        "ALLOW_DESTRUCTIVE": "false"
+      }
+    }
+  }
+}
