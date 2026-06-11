@@ -50,6 +50,8 @@ class HealthStatus:
     response_time_ms: float
     version: Optional[str] = None
     error: Optional[str] = None
+    pool_size: Optional[int] = None
+    pool_idle: Optional[int] = None
 
 
 class DatabaseAdapter(ABC):

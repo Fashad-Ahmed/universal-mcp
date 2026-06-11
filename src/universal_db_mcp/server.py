@@ -3,11 +3,17 @@
 import sys
 import json
 import asyncio
+import argparse
+import collections
+import sqlparse
+from sqlparse.tokens import Keyword
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Optional, List, Any, AsyncIterator
 
 from fastmcp import FastMCP
 
+from . import __version__
 from .config import load_config, ServerConfig
 from .security.sanitizer import SQLSanitizer
 from .adapters.base import DatabaseAdapter
@@ -18,6 +24,10 @@ from .adapters.duckdb import DuckDBAdapter
 
 server_config: Optional[ServerConfig] = None
 adapters: dict[str, DatabaseAdapter] = {}
+
+_query_history: collections.deque = collections.deque(maxlen=100)
+_schema_snapshots: dict[str, dict] = {}
+_query_semaphore = asyncio.Semaphore(10)
 
 
 def _create_adapter(db_config: Any) -> DatabaseAdapter:
@@ -98,6 +108,43 @@ def _error(msg: str, details: Optional[Any] = None, exc_type: str = "Error") -> 
     return json.dumps(payload, indent=2)
 
 
+def _audit_log(event: str, **kwargs: Any) -> None:
+    """Emit a structured JSON audit log entry to stderr."""
+    entry = {
+        "event": event,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        **kwargs,
+    }
+    print(json.dumps(entry, default=str), file=sys.stderr)
+
+
+def _extract_table_names(sql: str) -> List[str]:
+    """Extract table names referenced after FROM/JOIN keywords."""
+    tables: List[str] = []
+    parsed = sqlparse.parse(sql)
+    if not parsed:
+        return tables
+
+    next_is_table = False
+    for token in parsed[0].flatten():
+        if token.is_whitespace:
+            continue
+        if token.ttype is Keyword and token.value.upper() in ("FROM", "JOIN"):
+            next_is_table = True
+            continue
+        if next_is_table:
+            if token.ttype is Keyword:
+                next_is_table = False
+                continue
+            if token.ttype is None or str(token.ttype).startswith("Token.Name"):
+                name = str(token.value).strip().strip('"').strip("`")
+                if name:
+                    tables.append(name)
+            next_is_table = False
+
+    return tables
+
+
 @mcp.tool()
 async def query(
     sql: str,
@@ -134,16 +181,40 @@ async def query(
                     ["Only string, number, boolean, and null are allowed as parameters"],
                 )
 
+    if cfg.security.whitelisted_tables:
+        referenced = _extract_table_names(sql)
+        allowed = {t.lower() for t in cfg.security.whitelisted_tables}
+        blocked = [t for t in referenced if t.lower() not in allowed]
+        if blocked:
+            return _error("Table access denied", blocked)
+
+    _, complexity_warnings = SQLSanitizer.check_complexity(sql, cfg.security.max_joins)
+
     try:
         adapter = _get_adapter(database)
-        result = await adapter.query(sql, params)
+
+        if cfg.security.dry_run:
+            plan = await adapter.explain(sql, params)
+            response = {
+                "dry_run": True,
+                "plan": plan.plan,
+                "estimated_cost": plan.estimated_cost,
+                "estimated_rows": plan.estimated_rows,
+                "warning": "Dry-run mode enabled: query was not executed",
+            }
+            if complexity_warnings:
+                response["complexity_warnings"] = complexity_warnings
+            return json.dumps(response, indent=2, default=str)
+
+        async with _query_semaphore:
+            result = await adapter.query(sql, params)
 
         truncated = False
         if len(result.rows) > cfg.security.max_result_rows:
             result.rows = result.rows[: cfg.security.max_result_rows]
             truncated = True
 
-        response: dict[str, Any] = {
+        response = {
             "rows": result.rows,
             "row_count": result.row_count,
             "fields": result.fields,
@@ -151,12 +222,26 @@ async def query(
         }
         if truncated:
             response["warning"] = f"Results truncated to {cfg.security.max_result_rows} rows"
+        if complexity_warnings:
+            response["complexity_warnings"] = complexity_warnings
+
+        _query_history.append(
+            {
+                "sql": sql,
+                "database": f"{adapter.get_type()}:{adapter.get_database()}",
+                "execution_time_ms": round(result.execution_time_ms, 2),
+                "row_count": result.row_count,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
         if cfg.security.enable_logging:
-            print(
-                f"Query on {adapter.get_type()}:{adapter.get_database()} "
-                f"in {result.execution_time_ms:.2f}ms",
-                file=sys.stderr,
+            _audit_log(
+                "query",
+                database=f"{adapter.get_type()}:{adapter.get_database()}",
+                execution_time_ms=round(result.execution_time_ms, 2),
+                row_count=result.row_count,
+                truncated=truncated,
             )
 
         return json.dumps(response, indent=2, default=str)
@@ -263,6 +348,109 @@ async def health(database: Optional[str] = None) -> str:
                 "response_time_ms": round(status.response_time_ms, 2),
                 "version": status.version,
                 "error": status.error,
+                "pool_size": status.pool_size,
+                "pool_idle": status.pool_idle,
+            },
+            indent=2,
+        )
+    except Exception as e:
+        return _error(str(e), exc_type=type(e).__name__)
+
+
+@mcp.tool()
+async def query_history(limit: int = 10) -> str:
+    """
+    Get recent query execution history (most recent first).
+
+    Args:
+        limit: Maximum number of history entries to return (default 10)
+
+    Returns:
+        JSON list of recent queries with sql, database, execution_time_ms, row_count, timestamp.
+    """
+    entries = list(_query_history)[-limit:]
+    entries.reverse()
+    return json.dumps({"history": entries}, indent=2, default=str)
+
+
+async def _get_table_columns(database: Optional[str] = None) -> dict:
+    """Build a {table_name: {col_name: col_type}} map from the live schema."""
+    adapter = _get_adapter(database)
+    info = await adapter.get_schema()
+    snapshot: dict[str, dict[str, str]] = {}
+    for table in info.tables:
+        snapshot[table.name] = {col["name"]: col["type"] for col in table.columns}
+    return snapshot
+
+
+@mcp.tool()
+async def snapshot_schema(database: Optional[str] = None) -> str:
+    """
+    Take a snapshot of the current database schema for later drift detection.
+
+    Args:
+        database: Database key (format: "type:name")
+
+    Returns:
+        JSON confirming the snapshot was stored, with table count.
+    """
+    try:
+        adapter = _get_adapter(database)
+        key = f"{adapter.get_type()}:{adapter.get_database()}"
+        snapshot = await _get_table_columns(database)
+        _schema_snapshots[key] = snapshot
+        return json.dumps({"database": key, "tables_snapshotted": len(snapshot)}, indent=2)
+    except Exception as e:
+        return _error(str(e), exc_type=type(e).__name__)
+
+
+@mcp.tool()
+async def schema_diff(database: Optional[str] = None) -> str:
+    """
+    Compare the current schema against the last snapshot taken with snapshot_schema.
+
+    Args:
+        database: Database key (format: "type:name")
+
+    Returns:
+        JSON describing tables/columns added, dropped, or with changed types since the snapshot.
+    """
+    try:
+        adapter = _get_adapter(database)
+        key = f"{adapter.get_type()}:{adapter.get_database()}"
+        if key not in _schema_snapshots:
+            return _error("No snapshot found for this database", ["Call snapshot_schema first"])
+
+        previous = _schema_snapshots[key]
+        current = await _get_table_columns(database)
+
+        added_tables = sorted(set(current) - set(previous))
+        dropped_tables = sorted(set(previous) - set(current))
+
+        column_changes: dict[str, dict[str, Any]] = {}
+        for table in set(current) & set(previous):
+            prev_cols = previous[table]
+            curr_cols = current[table]
+            added_cols = sorted(set(curr_cols) - set(prev_cols))
+            dropped_cols = sorted(set(prev_cols) - set(curr_cols))
+            type_changed = {
+                col: {"from": prev_cols[col], "to": curr_cols[col]}
+                for col in set(prev_cols) & set(curr_cols)
+                if prev_cols[col] != curr_cols[col]
+            }
+            if added_cols or dropped_cols or type_changed:
+                column_changes[table] = {
+                    "added_columns": added_cols,
+                    "dropped_columns": dropped_cols,
+                    "type_changed": type_changed,
+                }
+
+        return json.dumps(
+            {
+                "database": key,
+                "added_tables": added_tables,
+                "dropped_tables": dropped_tables,
+                "column_changes": column_changes,
             },
             indent=2,
         )
@@ -294,8 +482,55 @@ async def list_databases() -> str:
     )
 
 
+async def _run_check() -> int:
+    """Validate config and test connectivity to all configured databases."""
+    config = load_config()
+
+    if not config.databases:
+        print("No databases configured.", file=sys.stderr)
+        return 1
+
+    all_ok = True
+    for db_config in config.databases:
+        label = f"{db_config.type}:{db_config.database}"
+        adapter = _create_adapter(db_config)
+        try:
+            await adapter.connect()
+            status = await adapter.health()
+            if status.connected:
+                print(f"✅ {label}: connected ({status.response_time_ms:.2f}ms)")
+            else:
+                print(f"❌ {label}: {status.error}")
+                all_ok = False
+        except Exception as e:
+            print(f"❌ {label}: {e}")
+            all_ok = False
+        finally:
+            try:
+                await adapter.disconnect()
+            except Exception:
+                pass
+
+    return 0 if all_ok else 1
+
+
 def main() -> None:
     """Entry point for the MCP server."""
+    parser = argparse.ArgumentParser(prog="universal-db-mcp")
+    parser.add_argument("--version", action="store_true", help="Print version and exit")
+    parser.add_argument(
+        "--check", action="store_true", help="Validate config and test database connections"
+    )
+    args = parser.parse_args()
+
+    if args.version:
+        print(__version__)
+        return
+
+    if args.check:
+        exit_code = asyncio.run(_run_check())
+        sys.exit(exit_code)
+
     mcp.run(transport="stdio")
 
 

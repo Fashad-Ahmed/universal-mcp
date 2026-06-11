@@ -154,7 +154,13 @@ class PostgreSQLAdapter(DatabaseAdapter):
             async with self.pool.acquire() as conn:
                 version = await conn.fetchval("SELECT version()")
             elapsed = (time.monotonic() - start) * 1000
-            return HealthStatus(connected=True, response_time_ms=elapsed, version=str(version))
+            return HealthStatus(
+                connected=True,
+                response_time_ms=elapsed,
+                version=str(version),
+                pool_size=self.pool.get_size(),
+                pool_idle=self.pool.get_idle_size(),
+            )
         except Exception as e:
             elapsed = (time.monotonic() - start) * 1000
             return HealthStatus(connected=False, response_time_ms=elapsed, error=str(e))

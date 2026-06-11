@@ -162,3 +162,40 @@ class TestHelperMethods:
     def test_mask_dsn_no_password_unchanged(self):
         dsn = "sqlite:///local.db"
         assert SQLSanitizer.mask_dsn(dsn) == dsn
+
+
+class TestCheckComplexity:
+    def test_simple_query_ok(self):
+        ok, warnings = SQLSanitizer.check_complexity("SELECT * FROM users WHERE id = 1")
+        assert ok
+        assert warnings == []
+
+    def test_too_many_joins_warned(self):
+        sql = (
+            "SELECT * FROM a "
+            "JOIN b ON a.id=b.a_id "
+            "JOIN c ON b.id=c.b_id "
+            "JOIN d ON c.id=d.c_id "
+            "JOIN e ON d.id=e.d_id "
+            "JOIN f ON e.id=f.e_id "
+            "JOIN g ON f.id=g.f_id "
+            "WHERE a.id = 1"
+        )
+        ok, warnings = SQLSanitizer.check_complexity(sql, max_joins=5)
+        assert not ok
+        assert any("JOIN" in w for w in warnings)
+
+    def test_select_star_without_where_or_limit_warned(self):
+        ok, warnings = SQLSanitizer.check_complexity("SELECT * FROM users")
+        assert not ok
+        assert any("SELECT *" in w for w in warnings)
+
+    def test_select_star_with_limit_ok(self):
+        ok, warnings = SQLSanitizer.check_complexity("SELECT * FROM users LIMIT 10")
+        assert ok
+        assert warnings == []
+
+    def test_select_star_with_where_ok(self):
+        ok, warnings = SQLSanitizer.check_complexity("SELECT * FROM users WHERE id = 1")
+        assert ok
+        assert warnings == []

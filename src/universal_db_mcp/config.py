@@ -33,6 +33,9 @@ class SecurityConfig(BaseModel):
     whitelisted_tables: Optional[List[str]] = None
     rate_limit_rpm: int = 60
     rate_limit_burst: int = 10
+    dry_run: bool = False
+    max_joins: int = 5
+    warn_select_star_no_limit: bool = True
 
 
 class ServerConfig(BaseModel):
@@ -59,6 +62,9 @@ def load_config() -> ServerConfig:
             ),
             rate_limit_rpm=int(os.getenv("RATE_LIMIT_RPM", "60")),
             rate_limit_burst=int(os.getenv("RATE_LIMIT_BURST", "10")),
+            dry_run=os.getenv("DRYRUN", "false").lower() == "true",
+            max_joins=int(os.getenv("MAX_JOINS", "5")),
+            warn_select_star_no_limit=os.getenv("WARN_SELECT_STAR_NO_LIMIT", "true").lower() == "true",
         ),
     )
 

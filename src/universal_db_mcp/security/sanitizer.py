@@ -3,7 +3,6 @@
 import re
 import sqlparse
 from typing import List, Tuple
-from sqlparse.tokens import Keyword
 
 
 class SQLSanitizer:
@@ -99,6 +98,30 @@ class SQLSanitizer:
                 val = str(token).strip().split()[0] if str(token).strip() else ""
                 return val
         return ""
+
+    @classmethod
+    def check_complexity(cls, query: str, max_joins: int = 5) -> Tuple[bool, List[str]]:
+        """
+        Check query for complexity issues.
+
+        Returns:
+            Tuple of (is_ok, list_of_warnings)
+        """
+        warnings: List[str] = []
+
+        join_count = len(re.findall(r"\bjoin\b", query, re.IGNORECASE))
+        if join_count > max_joins:
+            warnings.append(
+                f"Query has {join_count} JOINs, exceeding max_joins={max_joins}"
+            )
+
+        if re.search(r"select\s+\*", query, re.IGNORECASE):
+            if not re.search(r"\b(where|limit)\b", query, re.IGNORECASE):
+                warnings.append(
+                    "SELECT * without WHERE or LIMIT clause may return excessive rows"
+                )
+
+        return len(warnings) == 0, warnings
 
     @staticmethod
     def sanitize_identifier(identifier: str) -> str:
