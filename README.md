@@ -41,7 +41,9 @@ DUCKDB_PATH=./analytics.duckdb uvx universal-db-mcp
 DUCKDB_PATH=:memory: uvx universal-db-mcp
 ```
 
-Add to Claude Code in `~/.claude/mcp_servers.json`:
+Add to Claude Code in `~/.claude/mcp_servers.json`, or to Claude Desktop in
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) /
+`%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -57,6 +59,8 @@ Add to Claude Code in `~/.claude/mcp_servers.json`:
   }
 }
 ```
+
+Restart Claude Desktop / Claude Code after saving — that's it.
 
 That's it. Claude Code discovers the tools automatically.
 
