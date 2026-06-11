@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.1
+
+### Fixed
+- Resolved bandit B608 false positives in PostgreSQL/MySQL/SQLite/DuckDB schema
+  introspection queries (CI security scan now passes cleanly).
+
 ## v1.1.0
 
 ### Added
