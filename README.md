@@ -8,6 +8,8 @@
 [![FastMCP](https://img.shields.io/badge/MCP-FastMCP-green.svg)](https://github.com/jlowin/fastmcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+![Demo: schema discovery, a real query, a blocked DROP, and dry-run mode](assets/demo.gif)
+
 ---
 
 ## Why This Exists
