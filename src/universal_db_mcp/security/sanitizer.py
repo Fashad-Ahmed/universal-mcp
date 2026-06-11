@@ -20,6 +20,11 @@ class SQLSanitizer:
         "REVOKE",
         "EXEC",
         "EXECUTE",
+        "MERGE",
+        "ATTACH",
+        "DETACH",
+        "SET",
+        "CALL",
     }
 
     DANGEROUS_PATTERNS = [
@@ -64,13 +69,12 @@ class SQLSanitizer:
 
         statement = parsed[0]
 
-        first_keyword = cls._extract_first_keyword(statement)
-
-        if not allow_destructive and first_keyword:
-            if first_keyword.upper() in cls.DESTRUCTIVE_KEYWORDS:
-                errors.append(
-                    f"Destructive operation '{first_keyword.upper()}' not allowed in read-only mode"
-                )
+        if not allow_destructive:
+            for keyword in cls._extract_statement_keywords(statement):
+                if keyword.upper() in cls.DESTRUCTIVE_KEYWORDS:
+                    errors.append(
+                        f"Destructive operation '{keyword.upper()}' not allowed in read-only mode"
+                    )
 
         for pattern in cls.DANGEROUS_PATTERNS:
             if pattern.search(query):
@@ -83,21 +87,24 @@ class SQLSanitizer:
         return len(errors) == 0, errors
 
     @classmethod
-    def _extract_first_keyword(cls, statement: sqlparse.sql.Statement) -> str:
-        """Extract the first meaningful keyword from a parsed statement."""
-        for token in statement.tokens:
-            if token.is_whitespace:
-                continue
+    def _extract_statement_keywords(cls, statement: sqlparse.sql.Statement) -> List[str]:
+        """Extract every DML/DDL/keyword token in the statement (top-level, including
+        verbs hidden inside CTEs, e.g. `WITH x AS (...) DELETE FROM ...`)."""
+        keywords: List[str] = []
+        for token in statement.flatten():
             if token.ttype in (
                 sqlparse.tokens.Keyword.DML,
                 sqlparse.tokens.Keyword.DDL,
                 sqlparse.tokens.Keyword,
             ):
-                return str(token.value)
-            if not token.is_whitespace and token.ttype is None:
-                val = str(token).strip().split()[0] if str(token).strip() else ""
-                return val
-        return ""
+                keywords.append(str(token.value))
+        if not keywords:
+            first = statement.token_first(skip_ws=True, skip_cm=True)
+            if first is not None and first.ttype is None:
+                val = str(first).strip().split()[0] if str(first).strip() else ""
+                if val:
+                    keywords.append(val)
+        return keywords
 
     @classmethod
     def check_complexity(cls, query: str, max_joins: int = 5) -> Tuple[bool, List[str]]:
@@ -128,9 +135,10 @@ class SQLSanitizer:
         """Remove non-alphanumeric chars (except underscore) from identifiers."""
         return re.sub(r"[^a-zA-Z0-9_]", "", identifier)
 
-    @staticmethod
-    def is_read_only_query(query: str) -> bool:
-        """Check if query is read-only (SELECT/EXPLAIN/SHOW/DESCRIBE)."""
+    @classmethod
+    def is_read_only_query(cls, query: str) -> bool:
+        """Check if query is read-only (SELECT/EXPLAIN/SHOW/DESCRIBE), including
+        CTEs that don't hide a data-modifying statement (e.g. `WITH ... DELETE ...`)."""
         read_only_ops = {"SELECT", "EXPLAIN", "SHOW", "DESCRIBE", "DESC", "WITH"}
         parsed = sqlparse.parse(query)
         if not parsed:
@@ -139,9 +147,14 @@ class SQLSanitizer:
         first = statement.token_first(skip_ws=True, skip_cm=True)
         if first is None:
             return False
-        return str(first.value).upper() in read_only_ops
+        if str(first.value).upper() not in read_only_ops:
+            return False
+        return not any(
+            kw.upper() in cls.DESTRUCTIVE_KEYWORDS
+            for kw in cls._extract_statement_keywords(statement)
+        )
 
     @staticmethod
     def mask_dsn(dsn: str) -> str:
         """Remove password from DSN for safe logging."""
-        return re.sub(r"(://[^:]+:)[^@]+(@)", r"\1***\2", dsn)
+        return re.sub(r"(://[^:]+:)(.+)(@[^@/]+)", r"\1***\3", dsn)

@@ -16,14 +16,15 @@ from ..security.sanitizer import SQLSanitizer
 _DUCKDB_FILESYSTEM_PATTERN = re.compile(
     r"\b(read_csv|read_csv_auto|read_parquet|read_json|read_json_auto"
     r"|read_ndjson|read_ndjson_auto|glob|scan_parquet|scan_csv|scan_json"
-    r"|parquet_scan|csv_scan|json|load|install|httpfs|copy)\s*[\(\s]",
+    r"|parquet_scan|csv_scan|json|load|install|httpfs|copy|attach|detach)\s*[\(\s]",
     re.IGNORECASE,
 )
 
-# DuckDB extension loading — blocked via keyword match above, but also
-# catch the bare LOAD/INSTALL statement forms without parentheses.
+# DuckDB extension loading / database attachment — blocked via keyword match
+# above, but also catch the bare LOAD/INSTALL/ATTACH/DETACH statement forms
+# without parentheses (e.g. `ATTACH 'file.db' AS x`).
 _DUCKDB_LOAD_PATTERN = re.compile(
-    r"^\s*(load|install)\s+\S",
+    r"^\s*(load|install|attach|detach)\s+\S",
     re.IGNORECASE,
 )
 

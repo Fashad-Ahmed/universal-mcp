@@ -29,6 +29,33 @@ _query_history: collections.deque = collections.deque(maxlen=100)
 _schema_snapshots: dict[str, dict] = {}
 _query_semaphore = asyncio.Semaphore(10)
 
+_SYSTEM_SCHEMAS = {"information_schema", "pg_catalog", "sys", "mysql", "performance_schema"}
+
+
+class _TokenBucket:
+    """Simple token-bucket rate limiter (requests per minute, with burst capacity)."""
+
+    def __init__(self, rate_per_minute: int, burst: int) -> None:
+        self.rate_per_second = rate_per_minute / 60.0
+        self.capacity = max(burst, 1)
+        self.tokens = float(self.capacity)
+        self.last_refill = asyncio.get_event_loop().time()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> bool:
+        async with self._lock:
+            now = asyncio.get_event_loop().time()
+            elapsed = now - self.last_refill
+            self.tokens = min(self.capacity, self.tokens + elapsed * self.rate_per_second)
+            self.last_refill = now
+            if self.tokens >= 1:
+                self.tokens -= 1
+                return True
+            return False
+
+
+_rate_limiter: Optional[_TokenBucket] = None
+
 
 def _create_adapter(db_config: Any) -> DatabaseAdapter:
     if db_config.type == "postgresql":
@@ -66,8 +93,11 @@ async def _cleanup_adapters() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastMCP) -> AsyncIterator[None]:
-    global server_config
+    global server_config, _rate_limiter
     server_config = load_config()
+    _rate_limiter = _TokenBucket(
+        server_config.security.rate_limit_rpm, server_config.security.rate_limit_burst
+    )
     if not server_config.databases:
         print("Warning: No databases configured. Set POSTGRES_URI, SQLITE_PATH, or MYSQL_URI.", file=sys.stderr)
     else:
@@ -169,6 +199,12 @@ async def query(
     if cfg is None:
         return _error("Server not initialized")
 
+    if _rate_limiter is not None and not await _rate_limiter.acquire():
+        return _error(
+            "Rate limit exceeded",
+            [f"Limit: {cfg.security.rate_limit_rpm} requests/minute (burst {cfg.security.rate_limit_burst})"],
+        )
+
     is_valid, errors = SQLSanitizer.validate_query(sql, cfg.security.allow_destructive)
     if not is_valid:
         return _error("Query validation failed", errors)
@@ -184,7 +220,10 @@ async def query(
     if cfg.security.whitelisted_tables:
         referenced = _extract_table_names(sql)
         allowed = {t.lower() for t in cfg.security.whitelisted_tables}
-        blocked = [t for t in referenced if t.lower() not in allowed]
+        blocked = [
+            t for t in referenced
+            if t.lower() not in allowed or t.lower().split(".")[0] in _SYSTEM_SCHEMAS
+        ]
         if blocked:
             return _error("Table access denied", blocked)
 

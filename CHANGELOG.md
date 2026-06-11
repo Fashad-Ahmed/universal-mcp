@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.1.3
+
+### Security
+- **Fixed read-only bypass**: CTE-prefixed data-modifying statements
+  (`WITH x AS (DELETE/UPDATE/INSERT ... RETURNING ...) SELECT ...`) were not
+  detected as destructive and could execute in read-only mode. The validator
+  now scans all top-level keywords in a statement, not just the first.
+- **Blocked `SET` statements** in read-only mode — previously `SET SESSION
+  CHARACTERISTICS AS TRANSACTION READ WRITE` could flip a pooled PostgreSQL
+  connection to read-write.
+- **Blocked `ATTACH`/`DETACH`** (DuckDB) and `MERGE`/`CALL` in read-only mode.
+- **Table allowlist now blocks system catalogs** (`information_schema`,
+  `pg_catalog`, `mysql`, `performance_schema`, `sys`) when
+  `WHITELISTED_TABLES` is configured, preventing schema enumeration outside
+  the allowlist.
+- **Fixed `mask_dsn`** to correctly redact passwords containing `@`.
+- **Implemented rate limiting**: `RATE_LIMIT_RPM`/`RATE_LIMIT_BURST` are now
+  enforced via a token-bucket limiter on the `query` tool (previously
+  configured but unused).
+
 ## v1.1.2
 
 ### Added

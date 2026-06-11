@@ -68,6 +68,31 @@ class TestDestructiveKeywordBlocking:
         )
         assert valid, errors
 
+    def test_cte_prefixed_delete_blocked_readonly(self):
+        valid, errors = SQLSanitizer.validate_query(
+            "WITH del AS (DELETE FROM users WHERE id=1 RETURNING *) SELECT * FROM del",
+            allow_destructive=False,
+        )
+        assert not valid
+
+    def test_cte_prefixed_select_allowed_readonly(self):
+        valid, errors = SQLSanitizer.validate_query(
+            "WITH x AS (SELECT 1) SELECT * FROM x", allow_destructive=False
+        )
+        assert valid, errors
+
+    def test_set_session_blocked_readonly(self):
+        valid, errors = SQLSanitizer.validate_query(
+            "SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE", allow_destructive=False
+        )
+        assert not valid
+
+    def test_attach_blocked_readonly(self):
+        valid, errors = SQLSanitizer.validate_query(
+            "ATTACH 'other.db' AS x", allow_destructive=False
+        )
+        assert not valid
+
 
 class TestInjectionPatternDetection:
     def test_stacked_drop_rejected(self):
@@ -151,6 +176,11 @@ class TestHelperMethods:
     def test_is_not_read_only_insert(self):
         assert not SQLSanitizer.is_read_only_query("INSERT INTO t VALUES (1)")
 
+    def test_is_not_read_only_cte_delete(self):
+        assert not SQLSanitizer.is_read_only_query(
+            "WITH del AS (DELETE FROM t RETURNING *) SELECT * FROM del"
+        )
+
     def test_mask_dsn_hides_password(self):
         dsn = "postgresql://user:supersecret@localhost/mydb"
         masked = SQLSanitizer.mask_dsn(dsn)
@@ -162,6 +192,13 @@ class TestHelperMethods:
     def test_mask_dsn_no_password_unchanged(self):
         dsn = "sqlite:///local.db"
         assert SQLSanitizer.mask_dsn(dsn) == dsn
+
+    def test_mask_dsn_password_with_at_sign(self):
+        dsn = "postgresql://user:p@ssw0rd@localhost/mydb"
+        masked = SQLSanitizer.mask_dsn(dsn)
+        assert "p@ssw0rd" not in masked
+        assert "ssw0rd" not in masked
+        assert "localhost" in masked
 
 
 class TestCheckComplexity:
